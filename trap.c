@@ -40,7 +40,7 @@ trap(struct trapframe *tf)
     if(proc->killed)
       exit();
     proc->tf = tf;
-    syscall();
+    syscall();      //this calls the last function at the end of syscall.c
     if(proc->killed)
       exit();
     return;
@@ -103,7 +103,7 @@ trap(struct trapframe *tf)
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
   if(proc && proc->state == RUNNING && tf->trapno == T_IRQ0+IRQ_TIMER)
-    yield();
+    yield();            //*t
 
   // Check if the process has been killed since we yielded
   if(proc && proc->killed && (tf->cs&3) == DPL_USER)

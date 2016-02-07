@@ -7,6 +7,8 @@
 #include "proc.h"
 #include "spinlock.h"
 
+int cs_count = 0;
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -45,8 +47,8 @@ allocproc(void)
   return 0;
 
 found:
-  p->state = EMBRYO;
-  p->pid = nextpid++;
+  p->state = EMBRYO;        //this creates a new process (proc.c's function "fork" is calling this)
+  p->pid = nextpid++;       //pid is initialized here
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -266,7 +268,7 @@ void
 scheduler(void)
 {
   struct proc *p;
-
+//i think this is the kernel. it runs forever and schedules everything
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -275,20 +277,24 @@ scheduler(void)
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
-        continue;
+        continue;                   //continue ==> skip (until it finds runnable)
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      swtch(&cpu->scheduler, proc->context);
-      switchkvm();
+      //cprintf("process id: %d     Process Name: %s \n", proc->pid, proc->name);
+      
+        //run these three lines twice if you want it to be round robin 200ms
+      switchuvm(p);                 //this switches the 'p's memory
+      p->state = RUNNING;           //was runnable, now set it to RUNNING
+      swtch(&cpu->scheduler, proc->context);    //context switch to proc->context, and goto proc (comes back at another context switch)
+      
+      switchkvm();                  //go to kernel
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
-      proc = 0;
+      proc = 0;                     //temporary variable. don't worry about it
     }
     release(&ptable.lock);
 
@@ -311,7 +317,8 @@ sched(void)
   if(readeflags()&FL_IF)
     panic("sched interruptible");
   intena = cpu->intena;
-  swtch(&proc->context, cpu->scheduler);
+    cs_count++;
+  swtch(&proc->context, cpu->scheduler);        //switches from current process to the cpu scheduler to resume
   cpu->intena = intena;
 }
 
@@ -320,7 +327,7 @@ void
 yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
-  proc->state = RUNNABLE;
+  proc->state = RUNNABLE; //changes from running to runnable
   sched();
   release(&ptable.lock);
 }

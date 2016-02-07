@@ -43,6 +43,12 @@ sys_getpid(void)
 }
 
 int
+sys_getcount(void)
+{
+    return cs_count;
+}
+
+int
 sys_sbrk(void)
 {
   int addr;

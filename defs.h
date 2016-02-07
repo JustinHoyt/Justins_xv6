@@ -9,6 +9,9 @@ struct spinlock;
 struct stat;
 struct superblock;
 
+// count.c
+extern int cs_count;
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
