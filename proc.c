@@ -8,6 +8,8 @@
 #include "spinlock.h"
 
 int cs_count = 0;
+struct proc *head = 0;
+int LinkedListSize = 0;
 
 struct {
     struct spinlock lock;
@@ -204,7 +206,7 @@ exit(void)
             p->parent = initproc;
             if(p->state == ZOMBIE)
                 wakeup1(initproc);
-        }
+        } 
     }
     
     // Jump into the scheduler, never to return.
@@ -264,6 +266,93 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
+
+//Justin Hoyt 3/9/16 added linked list
+void add2End(struct proc* p) {
+	struct proc *current = 0;
+	struct proc *newProcess = p;
+	newProcess->next = 0;
+	LinkedListSize = LinkedListSize + 1;
+
+	if (head == 0) {
+		head = newProcess;
+	//	cprintf("\nFirst element of the list\n");
+	}
+
+	else {
+	    current = head;
+		while(current->next != 0) {
+			current = current->next;
+		}
+		current->next = newProcess;
+	//	cprintf("Added to end successfully!\n");
+	}
+}
+
+void printLinkedList() {
+	if(head == 0) {
+	//	cprintf("List empty!");
+	}
+	else {
+		struct proc* currentNode = head;
+		cprintf("List is:\n");
+		while (currentNode != 0) {
+			cprintf("\t%d\n", currentNode->pid);
+			currentNode = currentNode->next;
+		}
+	}
+}
+
+int getLinkedListSize(){
+    return LinkedListSize;
+}
+
+struct proc* LinkedListFront(){
+	return head; //return the process
+}
+
+struct proc* LinkedListDequeue(){
+	struct proc* dequeued = head; // front process you need to return
+	head = head->next;  // update head to new head
+	LinkedListSize = LinkedListSize - 1;
+	return dequeued; //return the process
+}
+
+void insertProc(int target) {
+	if (target < 0) {
+		cprintf("Too big of an index!\n");
+	}
+	else if (target > LinkedListSize) {
+		cprintf("Too big of an index!\n");
+	}
+	else {
+		struct proc* current = head;
+		int count = 0;
+		while (count < target) {
+			current = current->next;
+			count++;
+		}
+		struct proc* toMove = LinkedListDequeue();  //
+		toMove->next = current->next;
+		current->next = toMove;
+	}
+}
+
+
+
+
+void resetList(struct proc* currentHead) {
+    if (currentHead == 0)
+        return;
+    else {
+        resetList(currentHead->next);
+        currentHead->next = 0;
+    }
+}
+
+//----------- end linked list
+
+
 void
 scheduler(void)                                     //*** important
 {
@@ -275,30 +364,42 @@ scheduler(void)                                     //*** important
         
         // Loop over process table looking for process to run.
         acquire(&ptable.lock);
-        //NPROC is the size of teh queue (64)
+        
+        resetList(head);
+        head = 0;
+        LinkedListSize = 0;
+        
+        for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){ //*** the queue for round robbin // array is max 64
+            if(p->state == RUNNABLE || p->state == RUNNING){
+                add2End(p);
+            }
+        }
+        
+        //NPROC is the size of the queue (64)
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){ //*** the queue for round robbin // array is max 64
             if(p->state != RUNNABLE)
                 continue;                   //continue ==> skip (until it finds runnable)
             
-            // Switch to chosen process.  It is the process's job
-            // to release ptable.lock and then reacquire it
-            // before jumping back to us.
             proc = p;
+            
+            cprintf("linked list size:\n");
+            printLinkedList();
             //cprintf("process id: %d     Process Name: %s \n", proc->pid, proc->name);
             
             if (proc->quantumCounter == 0){
+                //cprintf("\n New process %d!\n", proc->pid);
                 cprintf("Round 0:     ");
-                cprintf("ptable.proc: %d", ptable.proc->pid + "    ");
                 cprintf("Process %d has consumed 100ms \n", proc->pid);
                 switchuvm(p);                 //this switches the 'p's memory
                 p->state = RUNNING;           //was runnable, now set it to RUNNING
                 swtch(&cpu->scheduler, proc->context);    // ***** context switch to
                 proc->quantumCounter++;
             }
+            
             else if (proc->quantumCounter == 1){
                 cprintf("Round 1:     Process %d has consumed 200ms \n", proc->pid);
                 int i = 0;
-                while(i < 2 && p->state == RUNNABLE){
+                while(i < 2 && (p->state == RUNNABLE || p->state == RUNNING)){
                     switchuvm(p);                 //this switches the 'p's memory
                     p->state = RUNNING;           //was runnable, now set it to RUNNING
                     swtch(&cpu->scheduler, proc->context);    // ***** context switch to
@@ -310,7 +411,7 @@ scheduler(void)                                     //*** important
                 cprintf("Round 2+:     ");
                 cprintf("Process %d has consumed 400ms \n", proc->pid);
                 int i = 0;
-                while(i < 4 && p->state == RUNNABLE){
+                while(i < 4 && (p->state == RUNNABLE || p->state == RUNNING)){
                     switchuvm(p);                 //this switches the 'p's memory
                     p->state = RUNNING;           //was runnable, now set it to RUNNING
                     swtch(&cpu->scheduler, proc->context);    // ***** context switch to
