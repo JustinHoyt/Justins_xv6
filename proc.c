@@ -295,7 +295,7 @@ void printLinkedList() {
 	}
 	else {
 		struct proc* currentNode = head;
-		cprintf("List is:\n");
+		//cprintf("List is:\n");
 		while (currentNode != 0) {
 			cprintf("\t%d\n", currentNode->pid);
 			currentNode = currentNode->next;
@@ -382,22 +382,29 @@ scheduler(void)                                     //*** important
             
             proc = p;
             
-            cprintf("linked list size:\n");
-            printLinkedList();
+            //cprintf("linked list size:\n");
+            //printLinkedList();
             //cprintf("process id: %d     Process Name: %s \n", proc->pid, proc->name);
             
             if (proc->quantumCounter == 0){
                 //cprintf("\n New process %d!\n", proc->pid);
-                cprintf("Round 0:     ");
-                cprintf("Process %d has consumed 100ms \n", proc->pid);
+                //cprintf("Round 0:     ");
+                //cprintf("Process %d has consumed 100ms \n", proc->pid);
                 switchuvm(p);                 //this switches the 'p's memory
                 p->state = RUNNING;           //was runnable, now set it to RUNNING
                 swtch(&cpu->scheduler, proc->context);    // ***** context switch to
+                
+                int oneFourthIndex = LinkedListSize /4;
+                cprintf("BEFORE: \n");
+                printLinkedList();
+                insertProc(oneFourthIndex);
+                cprintf("AFTER: \n");
+                printLinkedList();
                 proc->quantumCounter++;
             }
             
             else if (proc->quantumCounter == 1){
-                cprintf("Round 1:     Process %d has consumed 200ms \n", proc->pid);
+                //cprintf("Round 1:     Process %d has consumed 200ms \n", proc->pid);
                 int i = 0;
                 while(i < 2 && (p->state == RUNNABLE || p->state == RUNNING)){
                     switchuvm(p);                 //this switches the 'p's memory
@@ -405,11 +412,17 @@ scheduler(void)                                     //*** important
                     swtch(&cpu->scheduler, proc->context);    // ***** context switch to
                     i++;
                 }
+                int halfWay = getLinkedListSize()/2;
+                cprintf("BEFORE: \n");
+                printLinkedList();
+                insertProc(halfWay);
+                cprintf("AFTER: \n");
+                printLinkedList();
                 proc->quantumCounter++;
             }
             else if (proc->quantumCounter == 2){
-                cprintf("Round 2+:     ");
-                cprintf("Process %d has consumed 400ms \n", proc->pid);
+                //cprintf("Round 2+:     ");
+                //cprintf("Process %d has consumed 400ms \n", proc->pid);
                 int i = 0;
                 while(i < 4 && (p->state == RUNNABLE || p->state == RUNNING)){
                     switchuvm(p);                 //this switches the 'p's memory
