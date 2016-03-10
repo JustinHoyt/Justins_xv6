@@ -164,7 +164,7 @@ fork(void)
     acquire(&ptable.lock);
     np->state = RUNNABLE;
     release(&ptable.lock);
-    
+
     return pid;
 }
 
@@ -277,23 +277,15 @@ scheduler(void)                                     //*** important
         acquire(&ptable.lock);
         //NPROC is the size of teh queue (64)
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){ //*** the queue for round robbin // array is max 64
-            
-            //processes
-            int currentProcess = 0;
             if(p->state != RUNNABLE)
                 continue;                   //continue ==> skip (until it finds runnable)
-            //int queueLength = (int)&ptable.proc[NPROC];
-            //int placement = 0;
             
             // Switch to chosen process.  It is the process's job
             // to release ptable.lock and then reacquire it
             // before jumping back to us.
             proc = p;
-            
             //cprintf("process id: %d     Process Name: %s \n", proc->pid, proc->name);
             
-            //run these three lines twice if you want it to be round robin 200ms
-            //int pid = getpid();
             if (proc->quantumCounter == 0){
                 cprintf("Round 0:     ");
                 cprintf("ptable.proc: %d", ptable.proc->pid + "    ");
@@ -301,16 +293,6 @@ scheduler(void)                                     //*** important
                 switchuvm(p);                 //this switches the 'p's memory
                 p->state = RUNNING;           //was runnable, now set it to RUNNING
                 swtch(&cpu->scheduler, proc->context);    // ***** context switch to
-                
-                //move to 1/4 way down the queue
-                placement = NPROC / 4;
-                if(ptable.proc[placement] == NULL){
-                    ptable.proc[placement] = proc;
-                }
-                else{
-                    int j = ;
-                    for(j; j < )
-                }
                 proc->quantumCounter++;
             }
             else if (proc->quantumCounter == 1){
@@ -337,17 +319,16 @@ scheduler(void)                                     //*** important
             }
             //switchuvm(p);                 //this switches the 'p's memory
             //p->state = RUNNING;           //was runnable, now set it to RUNNING
-            //swtch(&cpu->scheduler, proc->context);    //***** context switch to proc->context, and goto proc (comes back at another context switch) //performing context switch
+            //swtch(&cpu->scheduler, proc->context);    //***** context switch to proc->context, and goto proc 
+            //performing context switch
             
             switchkvm();                  //go to kernel
             
             // Process is done running for now.
             // It should have changed its p->state before coming back.
             proc = 0;                     //temporary variable. don't worry about it
-            currentProcess++;
         }
         release(&ptable.lock);
-        
     }
 }
 
