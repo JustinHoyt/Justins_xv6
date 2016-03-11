@@ -9,8 +9,6 @@
 #define MAX_PROCS 64
 
 int cs_count = 0;
-struct proc *head = 0;
-int linkedListSize = 0;
 struct proc* runArray[MAX_PROCS];
 
 struct {
@@ -275,146 +273,93 @@ wait(void)
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
 
-//Justin Hoyt 3/9/16 added linked list
-void add2End(struct proc* p) {
-	struct proc *current = 0;
-	struct proc *newProcess = p;
-	newProcess->next = 0;
-	linkedListSize = linkedListSize + 1;
+// Justin Hoyt array functions ------------
 
-	if (head == 0) {
-		head = newProcess;
-		cprintf("\nadd2End(...) successfully added first node\n");
-	}
-	else {
-	    current = head;
-		while(current->next != 0) {
-			current = current->next;
-		}
-		current->next = newProcess;
-		cprintf("\nadd2End(...) Added to end successfully!\n");
-	}
-}
-
-void printLinkedList() {
-	if(head == 0) {
-		cprintf("\nprintLinkedList() List empty!\n");
-	}
-	else {
-		struct proc* currentNode = head;
-		cprintf("\nList is:\n");
-		while (currentNode != 0) {
-			cprintf("\t%d\n", currentNode->pid);
-			currentNode = currentNode->next;
-		}
-	}
-}
-
-int getLinkedListSize(){
-    return linkedListSize;
-}
-
-struct proc* frontOfLinkedList(){
-    if(head == 0){
-        cprintf("\nfrontOfLinkedList is NULL!\n");
-    }
-	return head; //return the process
-}
-
-struct proc* dequeueLinkedList(){
-    if(head == 0){
-        cprintf("\ndequeueLinkedList is NULL!\n");
-        return 0;
-    }
-    else{
-    	struct proc* dequeued = head; // front process you need to return
-    	head = head->next;  // update head to new head
-    	linkedListSize = linkedListSize - 1;
-    	dequeued->next = 0;
-    	return dequeued; //return the process
-    }
-}
-
-void insertProc(struct proc* newProc, int nthProc) {
-	if (nthProc < 0) {
-		cprintf("\nNegative index:     %d\n", nthProc);
-	}
-	else if (nthProc > linkedListSize) {
-		cprintf("\nToo big of an index!\n");
-	}
-	else {
-	    if(head == 0){
-	        head = newProc;
-	    }
-	    else{
-    		struct proc* current = head;
-    		int count = 0;
-    		while (count < nthProc - 1) {
-    			current = current->next;
-    			count++;
-    		}
-    		newProc->next = current->next;
-    		current->next = newProc;
-	    }
-	}
-}
-
-void resetList(struct proc* currentHead) {
-    if (currentHead == 0)
-        return;
-    else {
-        resetList(currentHead->next);
-        currentHead->next = 0;
-    }
-}
-
-int isInQueue(int target){
-    if(head == 0){
-        return 0;
-    }
-    else{
-        struct proc* current = head;
-        while(current != 0){
-            if(current->pid == target){
-                return 1;
-            }
-            else{
-                current = current->next;
-            }
-        }
-        return 0;
-    }
-}
-
-void runProcess(struct proc* p , int iterations){
+int getArraySize(){
     int i = 0;
-    while(i < iterations && (p->state == RUNNABLE || p->state == RUNNING)){
-        switchuvm(p);                 //this switches the 'p's memory
-        p->state = RUNNING;           //was runnable, now set it to RUNNING
-        swtch(&cpu->scheduler, proc->context);    // ***** context switch to
+    while(runArray[i] != 0){
         i++;
     }
-    switchkvm();
+    return i + 1;
 }
 
-void insertIntoLinkedList(int placementDivisor){
-    struct proc* frontProc = head;
-    int nthProc = (getLinkedListSize()) / placementDivisor;
-    cprintf("BEFORE: \n");
-    printLinkedList();
-    
-    if(frontProc != 0){
-        frontProc = dequeueLinkedList();
-        insertProc(frontProc, nthProc);
+void printArray(){
+    cprintf("\n---Array---\n");
+    int i;
+    for(i = 0; i < MAX_PROCS; i++){
+        if(i == 32){        //creates a line break in the middle
+            cprintf("\n");
+        }
+        if(runArray[i] != 0){
+            cprintf("[%d] ", runArray[i]->pid);
+        }
+        else{
+            cprintf("[ ] ");
+        }
     }
-    else{
-        insertProc(frontProc,nthProc);
-    }
-    cprintf("AFTER: \n");
-    printLinkedList();
+    cprintf("\n\n");
 }
 
-//----------- end linked list
+int isDuplicateElement(struct proc *p){
+    int i;
+    for(i = 0; i < getArraySize(); i++){
+        if(p == 0){
+            return 1;
+        }
+        if(p->state == runArray[i]->state){
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void updateArray(struct proc *p){
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+            continue;
+        //if(isDuplicateElement(p) == 0){
+            if(getArraySize() == MAX_PROCS){
+                cprintf("\n\npopulateArray(...) ARRAY OVERFLOW ERROR\n\n");
+            }
+            else{
+                int i;    
+                for(i = 0; i < MAX_PROCS; i++){
+                    if(runArray[i] == 0){
+                        runArray[i] = p;
+                        break;
+                    }
+                }
+            }
+        //}
+    }
+}
+
+void removeFirstArrayElement(){
+    int i;
+    for(i = 0; i < MAX_PROCS - 1; i++){
+        runArray[i] = runArray[i+1];
+    }
+    runArray[MAX_PROCS-1] = 0;
+}
+
+void insertIntoArray(struct proc* newProc, int position){
+    if(runArray[position] == 0){    //if spot empty
+        runArray[position] = newProc;
+    }
+    else{                           //if there's a collision
+        int i;
+        for(i = getArraySize(); i > position; i--){
+            runArray[i] = runArray[i-1]; 
+        } 
+        runArray[position] = newProc;
+    }
+}
+// end array functions --------------------
+
+
+
+
+
 
 //Justin Hoyt 3/10/16 scheduler
 void
@@ -425,54 +370,64 @@ scheduler(void)
     for(;;){
         // Enable interrupts on this processor.
         sti();
-        // Loop over process table looking for process to run.
         acquire(&ptable.lock);
         
+        int location = 0;
+        //updates array
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
             if(p->state != RUNNABLE)
                 continue;
-            int i;
-            for(i = 0; i < MAX_PROCS; i++){
-                if(runArray[i] == 0){
-                    runArray[i] = p;
-                    break;
-                }
-            }
             
-            for(i = 0; i < MAX_PROCS; i++){
-                if(runArray[i] != 0){
-                    cprintf("pid: %d\n", runArray[i]->pid);
+            if(!isDuplicateElement(p)){
+                if(getArraySize() == MAX_PROCS){
+                    cprintf("\n\npopulateArray(...) ARRAY OVERFLOW ERROR\n\n");
                 }
                 else{
-                    cprintf("pid: [ ]\n");
+                    int i;    
+                    for(i = 0; i < MAX_PROCS; i++){
+                        cprintf("\n pid: %d\n", p->pid);
+                        if(runArray[i] == 0){
+                            runArray[i] = p;
+                            break;
+                        }
+                    }
                 }
-            }
+           } 
+        }
+        if(runArray[0] != 0){
+            printArray();
+            
+            location = getArraySize();
+            p = runArray[0];
         
-            //if(/*isInQueue(p->pid) == 0 && */1){
-            //    add2End(p);
-            //}
-            
-            // Switch to chosen process.  It is the process's job
-            // to release ptable.lock and then reacquire it
-            // before jumping back to us.
             proc = p;
-            
+            // cprintf("\n\nI'M PRINTING BEFORE PANICING!\n\n");
             switchuvm(p);                 //this switches the 'p's memory
             p->state = RUNNING;           //was runnable, now set it to RUNNING
             swtch(&cpu->scheduler, proc->context);    // ***** context switch to    
-            //runProcess(p, 1);
-            // if(head != 0){
-            //     insertIntoLinkedList(END_OF_LIST);
-            // }
+
+            if(runArray[0]->state == RUNNABLE || runArray[0]->state == RUNNING){
+                struct proc* firstProc = runArray[0];
+                removeFirstArrayElement();
+                location--;
+                insertIntoArray(firstProc, location);
+            }
+            else{
+                removeFirstArrayElement();
+                location--;
+            }
             
-    
-            // Process is done running for now.
-            // It should have changed its p->state before coming back.
             proc = 0;
         }
         release(&ptable.lock);
+        
     }
 }
+
+
+
+
+
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state.
