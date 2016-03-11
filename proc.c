@@ -368,7 +368,7 @@ scheduler(void)
         sti();
         acquire(&ptable.lock);
         
-        int location = 0;t
+        int location = 0;
         //updates array
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
             if(p->state == RUNNABLE && !isDuplicateElement(p)){
