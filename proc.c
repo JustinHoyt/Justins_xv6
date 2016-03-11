@@ -323,7 +323,7 @@ void updateArray(struct proc *p){
             }
             else{
                 int i;    
-                for(i = 0; i < MAX_PROCS; i++){
+                for(i = 0; i < getArraySize(); i++){
                     if(runArray[i] == 0){
                         runArray[i] = p;
                         break;
@@ -357,10 +357,6 @@ void insertIntoArray(struct proc* newProc, int position){
 // end array functions --------------------
 
 
-
-
-
-
 //Justin Hoyt 3/10/16 scheduler
 void
 scheduler(void)
@@ -372,36 +368,34 @@ scheduler(void)
         sti();
         acquire(&ptable.lock);
         
-        int location = 0;
+        int location = 0;t
         //updates array
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-            if(p->state != RUNNABLE)
-                continue;
-            
-            if(!isDuplicateElement(p)){
+            if(p->state == RUNNABLE && !isDuplicateElement(p)){
                 if(getArraySize() == MAX_PROCS){
                     cprintf("\n\npopulateArray(...) ARRAY OVERFLOW ERROR\n\n");
                 }
                 else{
                     int i;    
-                    for(i = 0; i < MAX_PROCS; i++){
-                        cprintf("\n pid: %d\n", p->pid);
+                    for(i = 0; i < getArraySize(); i++){        //look for the first null index and insert
                         if(runArray[i] == 0){
+                            cprintf("\n pid: %d\n", p->pid);
                             runArray[i] = p;
+                            printArray();
                             break;
                         }
                     }
                 }
-           } 
+            }
         }
+        
         if(runArray[0] != 0){
-            printArray();
             
             location = getArraySize();
             p = runArray[0];
         
             proc = p;
-            // cprintf("\n\nI'M PRINTING BEFORE PANICING!\n\n");
+            cprintf("\n\nI'M PRINTING BEFORE PANICING!\n\n");
             switchuvm(p);                 //this switches the 'p's memory
             p->state = RUNNING;           //was runnable, now set it to RUNNING
             swtch(&cpu->scheduler, proc->context);    // ***** context switch to    
@@ -416,11 +410,9 @@ scheduler(void)
                 removeFirstArrayElement();
                 location--;
             }
-            
-            proc = 0;
         }
+        proc = 0;
         release(&ptable.lock);
-        
     }
 }
 
