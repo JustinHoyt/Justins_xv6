@@ -81,6 +81,7 @@ found:
     memset(p->context, 0, sizeof *p->context);
     p->context->eip = (uint)forkret;
     p->quantumCounter = 0;
+    p->milisecondsConsumed = 0;
     
     return p;
 }
@@ -170,6 +171,7 @@ fork(void)
     
     pid = np->pid;
     np->quantumCounter = 0;
+    np->milisecondsConsumed = 0;
     // lock to force the compiler to emit the np->state write last.
     acquire(&ptable.lock);
     np->state = RUNNABLE;
@@ -282,7 +284,7 @@ void printLinkedList() {
 	}
 	else {
 		struct proc* currentNode = head;
-		cprintf("\nLinkedList size is [%d]    = ", linkedListSize);
+		cprintf("\nLinkedList size is [%d]    = List ->", linkedListSize);
 		while (currentNode != 0) {
 			cprintf("|%d|->", currentNode->pid);
 			currentNode = currentNode->next;
@@ -290,7 +292,7 @@ void printLinkedList() {
 		cprintf("//\n");
 	}
 }
-//Justin Hoyt 3/9/16 added linked list
+
 void add2End(struct proc* p) {
 	struct proc *current = 0;
 	struct proc *newProcess = p;
@@ -299,7 +301,7 @@ void add2End(struct proc* p) {
 
 	if (head == 0) {
 		head = newProcess;
-//		cprintf("\nadd2End(...) successfully added first node\n");
+		//cprintf("\nadd2End(...) successfully added first node\n");
         printLinkedList();
 	}
 	else {
@@ -308,7 +310,7 @@ void add2End(struct proc* p) {
 			current = current->next;
 		}
 		current->next = newProcess;
-//		cprintf("\nadd2End(...) Added to end successfully!\n");
+		//cprintf("\nadd2End(...) Added to end successfully!\n");
         printLinkedList();
 	}
 }
@@ -395,16 +397,17 @@ void runProcess(struct proc* p , int iterations){
         switchuvm(p);                 //this switches the 'p's memory
         p->state = RUNNING;           //was runnable, now set it to RUNNING
         swtch(&cpu->scheduler, proc->context);    // ***** context switch to
+        p->milisecondsConsumed = p->milisecondsConsumed + 100;
         i++;
-    }                                 //dick balls
+    }                                 
     switchkvm();
 }
 
 void insertIntoLinkedList(int placementDivisor){
     struct proc* frontProc = head;
     int nthProc = (getLinkedListSize()) / placementDivisor;
-    cprintf("BEFORE: \t");
-    printLinkedList();
+    //cprintf("BEFORE: \t");
+    //printLinkedList();
     
     if(frontProc != 0){
         frontProc = dequeueLinkedList();
@@ -413,18 +416,17 @@ void insertIntoLinkedList(int placementDivisor){
     else{
         insertProc(frontProc,nthProc);
     }
-    cprintf("AFTER: \t");
-    printLinkedList();
+    //cprintf("AFTER: \t");
+    //printLinkedList();
 }
 
 //----------- end linked list
-
-//Justin Hoyt 3/10/16 scheduler
+//hustin joyt
 void
 scheduler(void)
 {
     struct proc* p;
-    struct proc* processInQueue;
+    
     
     for(;;){
         // Enable interrupts on this processor.
@@ -432,6 +434,7 @@ scheduler(void)
         // Loop over process table looking for process to run.
         acquire(&ptable.lock);
         
+        int iterations = 0;
         //Populate the linked list with newest processes that are runnable
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
             if(p->state == RUNNABLE)
@@ -444,19 +447,30 @@ scheduler(void)
         // Get the first element in the list
         if(linkedListSize > 0){
             //printLinkedList();
-            processInQueue = dequeueLinkedList();
+            p = dequeueLinkedList();
             // if the first element isn't null, and it's definitely runnable...
-            if(processInQueue->pid > 0 && (processInQueue->state == RUNNABLE || processInQueue->state == RUNNING)){  
-                proc = processInQueue;
+            if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){  
+                proc = p;
                 // so run the process once...
-                if(processInQueue->quantumCounter == 0)
-                    runProcess(processInQueue, 4);
-                else if(processInQueue->quantumCounter == 1)
-                    runProcess(processInQueue, 2);
-                else if(processInQueue->quantumCounter >= 2)
-                    runProcess(processInQueue, 1);
+                if(p->quantumCounter == 0){
+                    iterations = 1;
+                    runProcess(p, iterations);
+                    //cprintf("Process %d has consumed %dms", p->pid, p->milisecondsConsumed)
+                }
+                else if(p->quantumCounter == 1){
+                    iterations = 1;
+                    runProcess(p, iterations);
+                }
+                else if(p->quantumCounter == 2){
+                    iterations = 2;
+                    runProcess(p, iterations);
+                }
+                else if(p->quantumCounter >= 3){
+                    iterations = 4;
+                    runProcess(p, iterations);
+                }
                 // if it still needs more time to run, then 
-                if(processInQueue->state == RUNNABLE || processInQueue->state == RUNNING){
+                if(p->state == RUNNABLE || p->state == RUNNING){
                      insertIntoLinkedList(END_OF_LIST);
                 }
             }
@@ -464,7 +478,7 @@ scheduler(void)
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         proc = 0;
-        processInQueue = 0;
+        p = 0;
         release(&ptable.lock);
     }
 }
