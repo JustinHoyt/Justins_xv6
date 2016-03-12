@@ -11,7 +11,6 @@
 int cs_count = 0;
 struct proc *head = 0;
 int linkedListSize = 0;
-struct proc* runArray[MAX_PROCS];
 
 struct {
     struct spinlock lock;
@@ -297,7 +296,7 @@ void add2End(struct proc* p) {
 	struct proc *current = 0;
 	struct proc *newProcess = p;
 	newProcess->next = 0;
-	linkedListSize = linkedListSize + 1;
+	linkedListSize++;
 
 	if (head == 0) {
 		head = newProcess;
@@ -311,7 +310,7 @@ void add2End(struct proc* p) {
 		}
 		current->next = newProcess;
 		//cprintf("\nadd2End(...) Added to end successfully!\n");
-        printLinkedList();
+        //printLinkedList();
 	}
 }
 
@@ -334,7 +333,7 @@ struct proc* dequeueLinkedList(){
     else{
     	struct proc* dequeued = head;
     	head = head->next;
-    	linkedListSize = linkedListSize - 1;
+    	linkedListSize--;
     	dequeued->next = 0;
     	return dequeued;
     }
@@ -344,10 +343,10 @@ void insertProc(struct proc* newProc, int nthProc) {
 	if (nthProc < 0) {
 		cprintf("\nNegative index:     %d\n", nthProc);
 	}
-	if (nthProc > linkedListSize) {
+	else if (nthProc > linkedListSize) {
 		cprintf("\nToo big of an index!\n");
 	}
-    if(head == 0){
+    else if(head == 0){
         head = newProc;
     }
     else{
