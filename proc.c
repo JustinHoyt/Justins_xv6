@@ -323,7 +323,7 @@ struct proc* frontOfLinkedList(){
     if(head == 0){
         cprintf("\nfrontOfLinkedList is NULL!\n");
     }
-	return head; //return the process
+	return head;
 }
 
 struct proc* dequeueLinkedList(){
@@ -332,11 +332,11 @@ struct proc* dequeueLinkedList(){
         return 0;
     }
     else{
-    	struct proc* dequeued = head; // front process you need to return
-    	head = head->next;  // update head to new head
+    	struct proc* dequeued = head;
+    	head = head->next;
     	linkedListSize = linkedListSize - 1;
     	dequeued->next = 0;
-    	return dequeued; //return the process
+    	return dequeued;
     }
 }
 
@@ -344,24 +344,22 @@ void insertProc(struct proc* newProc, int nthProc) {
 	if (nthProc < 0) {
 		cprintf("\nNegative index:     %d\n", nthProc);
 	}
-	else if (nthProc > linkedListSize) {
+	if (nthProc > linkedListSize) {
 		cprintf("\nToo big of an index!\n");
 	}
-	else {
-	    if(head == 0){
-	        head = newProc;
-	    }
-	    else{
-    		struct proc* current = head;
-    		int count = 0;
-    		while (count < nthProc - 1) {
-    			current = current->next;
-    			count++;
-    		}
-    		newProc->next = current->next;
-    		current->next = newProc;
-	    }
-	}
+    if(head == 0){
+        head = newProc;
+    }
+    else{
+		struct proc* current = head;
+		int count = 0;
+		while (count < nthProc - 1) {
+			current = current->next;
+			count++;
+		}
+		newProc->next = current->next;
+		current->next = newProc;
+    }
 }
 
 void resetList(struct proc* currentHead) {
@@ -394,18 +392,28 @@ int isInQueue(int target){
 void runProcess(struct proc* p , int iterations){
     int i = 0;
     while(i < iterations && (p->state == RUNNABLE || p->state == RUNNING)){
-        switchuvm(p);                 //this switches the 'p's memory
-        p->state = RUNNING;           //was runnable, now set it to RUNNING
-        swtch(&cpu->scheduler, proc->context);    // ***** context switch to
-        p->milisecondsConsumed = p->milisecondsConsumed + 100;
+        switchuvm(p);                 
+        p->state = RUNNING;
+        swtch(&cpu->scheduler, proc->context);
         i++;
-    }                                 
+    }
+    p->milisecondsConsumed += 100 * iterations;
+    p->quantumCounter++;
     switchkvm();
 }
 
 void insertIntoLinkedList(int placementDivisor){
     struct proc* frontProc = head;
-    int nthProc = (getLinkedListSize()) / placementDivisor;
+    
+    int nthProc;   
+	int shouldWeRoundUp = (getLinkedListSize()%placementDivisor);
+	if (shouldWeRoundUp != 0){
+		nthProc = ((getLinkedListSize() - shouldWeRoundUp) / placementDivisor) + 1;
+	}
+	else {
+		nthProc = getLinkedListSize() / placementDivisor;
+	}
+
     //cprintf("BEFORE: \t");
     //printLinkedList();
     
@@ -421,62 +429,61 @@ void insertIntoLinkedList(int placementDivisor){
 }
 
 //----------- end linked list
-//hustin joyt
+
 void
 scheduler(void)
 {
     struct proc* p;
-    
-    
     for(;;){
-        // Enable interrupts on this processor.
         sti();
-        // Loop over process table looking for process to run.
         acquire(&ptable.lock);
         
         int iterations = 0;
-        //Populate the linked list with newest processes that are runnable
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
             if(p->state == RUNNABLE)
-            // if the list doesn't already have the process, add it!
             if(!isInQueue(p->pid)){
                 add2End(p);
             }
         }
         
-        // Get the first element in the list
         if(linkedListSize > 0){
-            //printLinkedList();
             p = dequeueLinkedList();
-            // if the first element isn't null, and it's definitely runnable...
             if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){  
                 proc = p;
-                // so run the process once...
                 if(p->quantumCounter == 0){
                     iterations = 1;
                     runProcess(p, iterations);
-                    //cprintf("Process %d has consumed %dms", p->pid, p->milisecondsConsumed)
+                    if(p->state == RUNNABLE || p->state == RUNNING){
+                         insertIntoLinkedList(QUARTER_OF_LIST);
+                    }
                 }
                 else if(p->quantumCounter == 1){
                     iterations = 1;
                     runProcess(p, iterations);
+                    if(p->state == RUNNABLE || p->state == RUNNING){
+                         insertIntoLinkedList(MIDDLE_OF_LIST);
+                    }
                 }
                 else if(p->quantumCounter == 2){
                     iterations = 2;
                     runProcess(p, iterations);
+                    if(p->state == RUNNABLE || p->state == RUNNING){
+                         insertIntoLinkedList(END_OF_LIST);
+                    }
                 }
                 else if(p->quantumCounter >= 3){
                     iterations = 4;
                     runProcess(p, iterations);
+                    if(p->state == RUNNABLE || p->state == RUNNING){
+                         insertIntoLinkedList(END_OF_LIST);
+                    }
                 }
-                // if it still needs more time to run, then 
-                if(p->state == RUNNABLE || p->state == RUNNING){
-                     insertIntoLinkedList(END_OF_LIST);
-                }
+                cprintf("\nProcess %d has consumed %dms", p->pid, p->milisecondsConsumed);
+            }
+            else{
+                p->milisecondsConsumed = 0;
             }
         }
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
         proc = 0;
         p = 0;
         release(&ptable.lock);
