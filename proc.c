@@ -301,7 +301,7 @@ void add2End(struct proc* p) {
 	if (head == 0) {
 		head = newProcess;
 		//cprintf("\nadd2End(...) successfully added first node\n");
-        printLinkedList();
+        //printLinkedList();
 	}
 	else {
 	    current = head;
@@ -310,7 +310,7 @@ void add2End(struct proc* p) {
 		}
 		current->next = newProcess;
 		//cprintf("\nadd2End(...) Added to end successfully!\n");
-        printLinkedList();
+        //printLinkedList();
 	}
 }
 
@@ -341,10 +341,10 @@ struct proc* dequeueLinkedList(){
 
 void insertProc(struct proc* newProc, int nthProc) {
 	if (nthProc < 0) {
-		cprintf("\nNegative index:     %d\n", nthProc);
+		//cprintf("\nNegative index:     %d\n", nthProc);
 	}
 	else if (nthProc > linkedListSize) {
-		cprintf("\nToo big of an index!\n");
+		//cprintf("\nToo big of an index!\n");
 	}
     else if(head == 0){
         head = newProc;
@@ -477,7 +477,7 @@ scheduler(void)
                          insertIntoLinkedList(END_OF_LIST);
                     }
                 }
-                cprintf("\nProcess %d has consumed %dms", p->pid, p->milisecondsConsumed);
+                cprintf("Process %d has consumed %dms\n", p->pid, p->milisecondsConsumed);
             }
             else{
                 p->milisecondsConsumed = 0;
