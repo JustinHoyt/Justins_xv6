@@ -445,7 +445,7 @@ scheduler(void)
             }
         }
         
-        if(linkedListSize > 0){
+        if(head != 0){
             p = dequeueLinkedList();
             if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){  
                 proc = p;
