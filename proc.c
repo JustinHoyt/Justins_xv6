@@ -446,7 +446,7 @@ scheduler(void)
             //printLinkedList();
             processInQueue = dequeueLinkedList();
             // if the first element isn't null, and it's definitely runnable...
-            if(processInQueue->pid > 0 && p->state != RUNNABLE){  // THIS LINE MAY BE WRONG BECAUSE WE CHECK THE PROCESS ID IN POSSIBLY EMPTY PROCESS
+            if(processInQueue->pid > 0 && (processInQueue->state == RUNNABLE || processInQueue->state == RUNNING)){  
                 proc = processInQueue;
                 // so run the process once...
                 if(processInQueue->quantumCounter == 0)
