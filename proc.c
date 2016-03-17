@@ -7,15 +7,53 @@
 #include "proc.h"
 #include "spinlock.h"
 #define MAX_PROCS 64
+#define NULL 0
 
 int cs_count = 0;
-struct proc *head = 0;
-int linkedListSize = 0;
+
+/* 
+possible problems:
+    runProcess() isn't running
+    not switching to Q2
+    cpu0: panic: acquire
+
+proposed solutions:
+    
+*/
+
+// struct{
+//   struct proc* firstQueueHead;
+//   struct proc* secondQueueHead;
+//   struct proc* thirdQueueHead;
+  
+//   int sizeOfFirstQueue;
+//   int sizeOfSecondQueue;
+//   int sizeOfThirdQueue;
+// } queue;
+
+struct{
+  struct proc* head;
+  int size;
+} firstQueue;
+
+struct{
+    struct proc* head;
+    int size;
+} secondQueue;
+
+struct{
+    struct proc* head;
+    int size;
+} thirdQueue;
+
+// firstQueue.size = 0;
+// secondQueue.size = 0;
+// thirdQueue.size = 0;
 
 struct {
     struct spinlock lock;
     struct proc proc[NPROC];
-} ptable;
+} ptable; 
 
 enum{
     END_OF_LIST = 1,
@@ -79,7 +117,6 @@ found:
     p->context = (struct context*)sp;
     memset(p->context, 0, sizeof *p->context);
     p->context->eip = (uint)forkret;
-    p->quantumCounter = 0;
     p->milisecondsConsumed = 0;
     
     return p;
@@ -169,7 +206,6 @@ fork(void)
     safestrcpy(np->name, proc->name, sizeof(proc->name));
     
     pid = np->pid;
-    np->quantumCounter = 0;
     np->milisecondsConsumed = 0;
     // lock to force the compiler to emit the np->state write last.
     acquire(&ptable.lock);
@@ -277,14 +313,14 @@ wait(void)
 //      via swtch back to the scheduler.
 
 
-void printLinkedList() {
-	if(head == 0) {
+void printLinkedList(struct proc* head, int size) {
+	if(head == NULL) {
 		cprintf("\nprintLinkedList() List empty!\n");
 	}
 	else {
 		struct proc* currentNode = head;
-		cprintf("\nLinkedList size is [%d]    = List ->", linkedListSize);
-		while (currentNode != 0) {
+		cprintf("\nLinkedList size is [%d]    = List ->", size);
+		while (currentNode != NULL) {
 			cprintf("|%d|->", currentNode->pid);
 			currentNode = currentNode->next;
 		}
@@ -292,99 +328,46 @@ void printLinkedList() {
 	}
 }
 
-void add2End(struct proc* p) {
-	struct proc *current = 0;
+void add2End(struct proc* head, int size, struct proc* p) {
+	struct proc *current = NULL;
 	struct proc *newProcess = p;
-	newProcess->next = 0;
-	linkedListSize++;
+	newProcess->next = NULL;
+	size++;
 
-	if (head == 0) {
+	if (head == NULL) {
 		head = newProcess;
-		//cprintf("\nadd2End(...) successfully added first node\n");
+		cprintf("\nadd2End(...) successfully added first node\n");
         //printLinkedList();
 	}
 	else {
 	    current = head;
-		while(current->next != 0) {
+		while(current->next != NULL) {
 			current = current->next;
 		}
 		current->next = newProcess;
-		//cprintf("\nadd2End(...) Added to end successfully!\n");
+		cprintf("\nadd2End(...) Added to end successfully!\n");
         //printLinkedList();
 	}
 }
 
-int getLinkedListSize(){
-    return linkedListSize;
-}
-
-struct proc* frontOfLinkedList(){
-    if(head == 0){
+struct proc* frontOfLinkedList(struct proc* head){
+    if(head == NULL){
         cprintf("\nfrontOfLinkedList is NULL!\n");
     }
 	return head;
 }
 
-struct proc* dequeueLinkedList(){
-    if(head == 0){
+struct proc* dequeueLinkedList(struct proc* head, int size){
+    if(head == NULL){
         cprintf("\ndequeueLinkedList is NULL!\n");
         return 0;
     }
     else{
     	struct proc* dequeued = head;
     	head = head->next;
-    	linkedListSize--;
-    	dequeued->next = 0;
+    	size--;
+    	dequeued->next = NULL;
     	return dequeued;
-    }
-}
-
-void insertProc(struct proc* newProc, int nthProc) {
-	if (nthProc < 0) {
-		//cprintf("\nNegative index:     %d\n", nthProc);
-	}
-	else if (nthProc > linkedListSize) {
-		//cprintf("\nToo big of an index!\n");
-	}
-    else if(head == 0){
-        head = newProc;
-    }
-    else{
-		struct proc* current = head;
-		int count = 0;
-		while (count < nthProc - 1) {
-			current = current->next;
-			count++;
-		}
-		newProc->next = current->next;
-		current->next = newProc;
-    }
-}
-
-void resetList(struct proc* currentHead) {
-    if (currentHead == 0)
-        return;
-    else {
-        resetList(currentHead->next);
-        currentHead->next = 0;
-    }
-}
-
-int isInQueue(int target){
-    if(head == 0){
-        return 0;
-    }
-    else{
-        struct proc* current = head;
-        while(current != 0){
-            if(current->pid == target){
-                return 1;
-            }
-            else{
-                current = current->next;
-            }
-        }
-        return 0;
     }
 }
 
@@ -397,34 +380,25 @@ void runProcess(struct proc* p , int iterations){
         i++;
     }
     p->milisecondsConsumed += 100 * iterations;
-    p->quantumCounter++;
     switchkvm();
 }
 
-void insertIntoLinkedList(int placementDivisor){
-    struct proc* frontProc = head;
-    
-    int nthProc;   
-	int shouldWeRoundUp = (getLinkedListSize()%placementDivisor);
-	if (shouldWeRoundUp != 0){
-		nthProc = ((getLinkedListSize() - shouldWeRoundUp) / placementDivisor) + 1;
-	}
-	else {
-		nthProc = getLinkedListSize() / placementDivisor;
-	}
-
-    //cprintf("BEFORE: \t");
-    //printLinkedList();
-    
-    if(frontProc != 0){
-        frontProc = dequeueLinkedList();
-        insertProc(frontProc, nthProc);
+int isInQueue(struct proc* head, int target){
+    if(head == NULL){
+        return 0;
     }
     else{
-        insertProc(frontProc,nthProc);
+        struct proc* current = head;
+        while(current != NULL){
+            if(current->pid == target){
+                return 1;
+            }
+            else{
+                current = current->next;
+            }
+        }
+        return 0;
     }
-    //cprintf("AFTER: \t");
-    //printLinkedList();
 }
 
 //----------- end linked list
@@ -432,56 +406,118 @@ void insertIntoLinkedList(int placementDivisor){
 void
 scheduler(void)
 {
-    struct proc* p;
+    firstQueue.size = 0;
+    secondQueue.size = 0;
+    thirdQueue.size = 0;
+    
+    firstQueue.head = NULL;
+    secondQueue.head = NULL;
+    thirdQueue.head = NULL;
+    
+    struct proc* p = NULL;
     for(;;){
         sti();
         acquire(&ptable.lock);
         
         int iterations = 0;
         for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-            if(p->state == RUNNABLE)
-            if(!isInQueue(p->pid)){
-                add2End(p);
+            if(p->state == RUNNABLE &&
+                    !isInQueue(firstQueue.head, p->pid) &&
+                    !isInQueue(secondQueue.head, p->pid) &&
+                    !isInQueue(thirdQueue.head, p->pid)){
+                //cprintf("Process %d was added to the queue\n", p->pid);
+            	struct proc *current = NULL;
+            	p->next = NULL;
+            	firstQueue.size++;
+            
+            	if (firstQueue.head == NULL) {
+            		firstQueue.head = p;
+            		cprintf("\nadd2End(...) successfully added first node\n");
+                    printLinkedList(firstQueue.head, firstQueue.size);
+            	}
+            	else {
+            	    current = firstQueue.head;
+            		while(current->next != NULL) {
+            			current = current->next;
+            		}
+            		current->next = p;
+            		cprintf("\nadd2End(...) Added to end successfully!\n");
+                    printLinkedList(firstQueue.head, firstQueue.size);
+            	}
             }
         }
-        
-        if(head != 0){
-            p = dequeueLinkedList();
-            if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){  
-                proc = p;
-                if(p->quantumCounter == 0){
-                    iterations = 1;
-                    runProcess(p, iterations);
-                    if(p->state == RUNNABLE || p->state == RUNNING){
-                         insertIntoLinkedList(QUARTER_OF_LIST);
-                    }
-                }
-                else if(p->quantumCounter == 1){
-                    iterations = 1;
-                    runProcess(p, iterations);
-                    if(p->state == RUNNABLE || p->state == RUNNING){
-                         insertIntoLinkedList(MIDDLE_OF_LIST);
-                    }
-                }
-                else if(p->quantumCounter == 2){
-                    iterations = 2;
-                    runProcess(p, iterations);
-                    if(p->state == RUNNABLE || p->state == RUNNING){
-                         insertIntoLinkedList(END_OF_LIST);
-                    }
-                }
-                else if(p->quantumCounter >= 3){
-                    iterations = 4;
-                    runProcess(p, iterations);
-                    if(p->state == RUNNABLE || p->state == RUNNING){
-                         insertIntoLinkedList(END_OF_LIST);
-                    }
-                }
-                cprintf("Process %d has consumed %dms\n", p->pid, p->milisecondsConsumed);
+        if(firstQueue.head != NULL){
+            p = dequeueLinkedList(firstQueue.head, firstQueue.size);   // p gets top of firstQueue
+            if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){ // provided p is runnable  
+                iterations = 1;
             }
-            else{
-                p->milisecondsConsumed = 0;
+        }
+        else if(secondQueue.head != NULL){
+            cprintf("\nPRINTED BEFORE PAGE FAULT 2!\n");
+            p = dequeueLinkedList(secondQueue.head, secondQueue.size);  // p gets top of secondQueue
+            if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){ // provided p is runnable  
+                iterations = 2;
             }
+        }
+        else if(thirdQueue.head != NULL){
+            cprintf("\nPRINTED BEFORE PAGE FAULT 3!\n");
+            p = dequeueLinkedList(thirdQueue.head, thirdQueue.size);
+            if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){
+                iterations = 4;
+            }
+        }
+        if(p != NULL && p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){
+            proc = p;
+            runProcess(p, iterations); // run p 'x' number of times
+            if(p->pid > 0 && (p->state == RUNNABLE || p->state == RUNNING)){ // then if it still needs more time...
+                 if(iterations == 1){
+                    struct proc *current = NULL;
+                	p->next = NULL;
+                	secondQueue.size++;
+                
+                	if (secondQueue.head == NULL) {
+                		secondQueue.head = p;
+                		cprintf("\nadd2End(...) successfully added first node to Q1\n");
+                        printLinkedList(secondQueue.head, secondQueue.size);
+                	}
+                	else {
+                	    current = secondQueue.head;
+                		while(current->next != NULL) {
+                			current = current->next;
+                		}
+                		current->next = p;
+                		cprintf("\nadd2End(...) Added to end of Q1!\n");
+                        printLinkedList(secondQueue.head, secondQueue.size);
+                	}
+                 }
+                 else if(iterations >= 2){
+                    struct proc *current = NULL;
+                	p->next = NULL;
+                	thirdQueue.size++;
+                
+                	if (thirdQueue.head == NULL) {
+                		thirdQueue.head = p;
+                		cprintf("\nadd2End(...) successfully added first node of Q2\n");
+                        printLinkedList(thirdQueue.head, thirdQueue.size);
+                	}
+                	else {
+                	    current = thirdQueue.head;
+                		while(current->next != NULL) {
+                			current = current->next;
+                		}
+                		current->next = p;
+                		cprintf("\nadd2End(...) Added to end of Q2+!\n");
+                        printLinkedList(thirdQueue.head, thirdQueue.size);
+                	}
+                }
+            }
+        }
+        else{
+            p->milisecondsConsumed = 0;
+        }
+        if(p != NULL && p->pid > 0){
+            cprintf("\nPRINTED BEFORE PAGE FAULT 1!\n");
+            cprintf("Process %d has consumed %dms\n", p->pid, p->milisecondsConsumed);
         }
         proc = 0;
         p = 0;
